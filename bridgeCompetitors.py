@@ -85,11 +85,11 @@ def get_player_competitions(player):
                 'Date': date,
                 'DateSort': hebrew_date_to_datetime(date),  # For sorting
                 'Player Name': player['Name'],
-                'NBO': f"https://bridge.co.il/viewer/membermplist.php?id={nbo_id}",
-                'BBO': f"https://www.bridgebase.com/myhands/hands.php?username={player['BBO']}&start_time={start_time}&end_time={end_time}&from_login=0",
                 'Competition Name': competition_name,
+                'Points': points,
                 'Competition URL': competition_url,
-                'Points': points
+                'NBO': f"https://bridge.co.il/viewer/membermplist.php?id={nbo_id}",
+                'BBO': f"https://www.bridgebase.com/myhands/hands.php?username={player['BBO']}&start_time={start_time}&end_time={end_time}&from_login=0"                
             })
         
         return competitions
@@ -135,7 +135,7 @@ def main():
             df = df.sort_values('DateSort', ascending=False)
             
             # Select and order columns for display
-            df = df[['Date', 'Player Name', 'NBO', 'BBO', 'Competition Name', 'Points', 'Competition URL']]
+            df = df[['Date', 'Player Name', 'Competition Name', 'Points', 'Competition URL', 'NBO', 'BBO']]
             
             st.subheader(f"Recent Competitions for {selected_player}")
             st.dataframe(
