@@ -59,7 +59,7 @@ def get_player_competitions(player):
             return []
         
         # Get all rows with class "temp hl" from this table
-        rows = table.select('tr.temp.hl')[:3]  # Get top 3 competitions
+        rows = table.select('tr.temp.hl')[:10]  # Get top 10 competitions
         
         start_time, end_time = get_bbo_time_range()
         competitions = []
