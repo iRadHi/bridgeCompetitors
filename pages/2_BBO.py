@@ -610,10 +610,10 @@ def main():
                             df = df.sort_values('Total Hands', ascending=False)
                             
                             # Convert BBO Link to clickable hyperlinks
-                            df['BBO Link'] = df['BBO Link'].apply(lambda x: f'<a href="{x}" target="_blank">{x}</a>')
-                            
-                            # Display final dataframe with clickable links
-                            st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
+                            df['BBO Link'] = df['BBO Link'].apply(lambda x: f'<a href="{x}" target="_blank">Link</a>')
+
+                            # Display final dataframe with clickable links using st.dataframe
+                            st.dataframe(df, use_container_width=True, hide_index=True, escape_html=False)
                             
                             # Download options
                             csv = df.drop(columns=['BBO Link']).to_csv(index=False, encoding='utf-8-sig')
@@ -648,7 +648,10 @@ def main():
                                 soup, table = scrape_bbo_hands(session, url, proxy_config)
                                 if soup and table:
                                     try:
-                                        df = pd.read_html(str(table))[0]
+                                        try:
+                                            df = pd.read_html(str(table), flavor='lxml')[0]
+                                        except ImportError:
+                                            df = pd.read_html(str(table), flavor='html5lib')[0]
                                         
                                         # Process the DataFrame
                                         # 1. Remove index column if it exists
@@ -659,7 +662,6 @@ def main():
                                         #columns_to_drop = [col for col in df.columns if col in ['Movie', 'Traveller']]
                                         #if columns_to_drop:
                                         #    df = df.drop(columns=columns_to_drop)
-                                        
                                         # 2. Remove the last two columns (Movie and Traveller)
                                         df = df.iloc[:, :-2]
                                         
