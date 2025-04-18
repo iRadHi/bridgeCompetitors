@@ -611,9 +611,41 @@ def main():
                             
                             # Convert BBO Link to clickable hyperlinks
                             df['BBO Link'] = df['BBO Link'].apply(lambda x: f'<a href="{x}" target="_blank">Link</a>')
-
-                            # Display final dataframe with clickable links using st.dataframe
-                            st.dataframe(df, use_container_width=True, hide_index=True, escape_html=False)
+                            
+                            # Apply custom CSS to mimic Streamlit table styling
+                            st.markdown("""
+                            <style>
+                            .stTable table {
+                                width: 100%;
+                                border-collapse: collapse;
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                            }
+                            .stTable th, .stTable td {
+                                padding: 8px 12px;
+                                text-align: left;
+                                border-bottom: 1px solid #e6e6e6;
+                            }
+                            .stTable th {
+                                background-color: #f5f5f5;
+                                font-weight: 600;
+                            }
+                            .stTable tr:hover {
+                                background-color: #f0f2f6;
+                            }
+                            .stTable a {
+                                color: #0068c9;
+                                text-decoration: none;
+                            }
+                            .stTable a:hover {
+                                text-decoration: underline;
+                            }
+                            </style>
+                            <div class="stTable">
+                            """, unsafe_allow_html=True)
+                            
+                            # Display final dataframe with clickable links
+                            st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
+                            st.markdown("</div>", unsafe_allow_html=True)
                             
                             # Download options
                             csv = df.drop(columns=['BBO Link']).to_csv(index=False, encoding='utf-8-sig')
