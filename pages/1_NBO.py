@@ -60,7 +60,7 @@ def get_player_competitions(player):
             return []
         
         competitions = []
-        for row in table.select('tr.temp.hl')[:3]:  # Top 3 competitions
+        for row in table.select('tr.temp.hl')[:20]:  # Top 20 competitions
             cols = row.find_all('td')
             if len(cols) < 2:  # Skip incomplete rows
                 continue
@@ -89,7 +89,7 @@ def get_player_competitions(player):
 
 # Main page function
 def main():
-    st.title("🇮🇱 NBO Competition Results")
+    st.title("Israel NBO Competition Results")
     st.markdown("View recent competition results from the Israeli Bridge Federation")
     
     # Load and cache players data
