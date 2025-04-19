@@ -54,6 +54,8 @@ def get_unix_timestamp(days_back):
 def get_bbo_time_range(timeframe):
     timeframes = {
         "Last Day": 1,
+        "Last 2 Days": 2,
+        "Last 3 Days": 3,
         "Last Week": 7,
         "Last 2 Weeks": 14,
         "Last Month": 30
@@ -283,7 +285,7 @@ def login_to_bbo(username, password, proxy=None):
                 st.info("Consider using Manual Cookies method instead")
             elif login_response.url.endswith("myhands_login.php"):
                 st.error("Login failed - credentials rejected or form not submitted")
-            elif "Invalid username or password" in login_response.text:
+            elif "Invalid usernames or password" in login_response.text:
                 st.error("BBO rejected the credentials")
             
             st.text("Response snippet:")
@@ -304,7 +306,7 @@ def scrape_bbo_hands(session, url, proxy=None, silent=False):
         
         if 'login.php' in refresh_resp.url:
             st.error("Session has expired. Please login again.")
-            return None, None
+            return None, None, None, None
             
         time.sleep(random.uniform(0.5, 1.5))
 
@@ -335,7 +337,7 @@ def scrape_bbo_hands(session, url, proxy=None, silent=False):
         if 'login.php' in response.url:
             logger.warning("Session expired")
             st.error("Session expired during data retrieval")
-            return None, None
+            return None, None, None, None
         
         if 'Javascript support is needed' in response.text:
             if not silent:
@@ -348,10 +350,28 @@ def scrape_bbo_hands(session, url, proxy=None, silent=False):
             
         if "You have no saved hands" in response.text:
             logger.info("No hands found")
-            return None, None
+            return None, None, None, None
             
         # Parse response
         soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Extract unique dates and last played date
+        dates = []
+        last_played = None
+        for row in soup.find_all('tr'):
+            th = row.find('th', colspan='11')
+            if th and th.text.strip():
+                date_str = th.text.strip()
+                try:
+                    # Validate date format (YYYY-MM-DD)
+                    datetime.strptime(date_str, '%Y-%m-%d')
+                    dates.append(date_str)
+                    if not last_played or date_str > last_played:
+                        last_played = date_str
+                except ValueError:
+                    continue
+        unique_dates = sorted(set(dates))
+        days_played = len(unique_dates)
         
         # Try different table selectors
         table_selectors = [
@@ -379,19 +399,19 @@ def scrape_bbo_hands(session, url, proxy=None, silent=False):
                         break
         
         if table:
-            return soup, table
+            return soup, table, days_played, last_played
         else:
             logger.warning("No table found")
             if not silent:
                 with st.expander("Raw Response", expanded=False):
                     st.text(response.text[:2000])
-            return None, None
+            return None, None, None, None
             
     except Exception as e:
         logger.error(f"Scraping error: {str(e)}")
         if not silent:
             st.error(f"Error retrieving data: {str(e)}")
-        return None, None
+        return None, None, None, None
 
 def extract_player_statistics(soup):
     """Extract player statistics from the soup"""
@@ -443,8 +463,8 @@ def extract_player_statistics(soup):
                 if numhands_cell:
                     stats['MPs_Hands'] = int(numhands_cell.text.strip())
             
-            # Extract Total Masterpoints
-            elif "Total Masterpoints" in label:
+            # Extract Discard Masterpoints
+            elif "Discard Masterpoints" in label:
                 score_cell = row.find('td', class_='score')
                 if score_cell:
                     stats['Total_Masterpoints'] = float(score_cell.text.strip())
@@ -540,7 +560,7 @@ def main():
                 # Create timeframe selection dropdown
                 timeframe = st.selectbox(
                     "Time Frame",
-                    ["Last Month", "Last Week", "Last 2 Weeks", "Last Day"],
+                    ["Last Month", "Last 2 Weeks", "Last Week", "Last 3 Days", "Last 2 Days", "Last Day"],
                     index=0,
                     key="timeframe_dropdown"
                 )
@@ -581,7 +601,7 @@ def main():
                             )
                             
                             # Use silent mode to suppress individual info messages
-                            soup, table = scrape_bbo_hands(session, url, proxy_config, silent=True)
+                            soup, table, days_played, last_played = scrape_bbo_hands(session, url, proxy_config, silent=True)
                             
                             if soup and table:
                                 # Extract statistics
@@ -590,7 +610,8 @@ def main():
                                 # Create player statistics entry
                                 player_entry = {
                                     'Player Name': player['Name'],
-                                    'BBO Username': player['BBO'],
+                                    'Days Played': days_played if days_played is not None else 0,
+                                    'Last Played': last_played if last_played is not None else 'N/A',
                                     'Total Hands': stats['IMPs_Hands'] + stats['MPs_Hands'],
                                     'IMPs Hands': stats['IMPs_Hands'],
                                     'IMPs Total': stats['IMPs_Total'],
@@ -677,7 +698,7 @@ def main():
                             st.subheader(f"Hand Records for {player['Name']} ({timeframe})")
                             
                             with st.spinner(f"Fetching data for {player['Name']}..."):
-                                soup, table = scrape_bbo_hands(session, url, proxy_config)
+                                soup, table, _, _ = scrape_bbo_hands(session, url, proxy_config)
                                 if soup and table:
                                     try:
                                         try:
@@ -690,20 +711,15 @@ def main():
                                         if df.columns[0] is not None and isinstance(df.columns[0], str) and df.columns[0].startswith('Unnamed'):
                                             df = df.iloc[:, 1:]
                                             
-                                        # 2. Remove 'Movie' and 'Traveller' columns if they exist
-                                        #columns_to_drop = [col for col in df.columns if col in ['Movie', 'Traveller']]
-                                        #if columns_to_drop:
-                                        #    df = df.drop(columns=columns_to_drop)
                                         # 2. Remove the last two columns (Movie and Traveller)
                                         df = df.iloc[:, :-2]
                                         
-                                        # 3. Ensure the first column is "Nº." and remove auto-index
+                                        # 3. Ensure the first column is "Nº." if it exists
                                         if "Nº." in df.columns:
                                             first_col = "Nº."
                                             cols = [first_col] + [col for col in df.columns if col != first_col]
                                             df = df[cols]
                                         
-                                        # Display without index
                                         st.dataframe(df, use_container_width=True, hide_index=True)
                                         st.success(f"Found {len(df)} records")
                                         
@@ -726,7 +742,7 @@ def main():
                                             st.write(f"IMPs Average: {stats['IMPs_Average']}")
                                             st.write(f"MPs Hands: {stats['MPs_Hands']}")
                                             st.write(f"MPs Average: {stats['MPs_Average']}%")
-                                            st.write(f"Total Masterpoints: {stats['Total_Masterpoints']}")
+                                            st.write(f"Discard Masterpoints: {stats['Total_Masterpoints']}")
                                         
                                     except Exception as e:
                                         st.error(f"Error processing table: {str(e)}")
